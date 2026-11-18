@@ -1,0 +1,11 @@
+[Unit]
+Description=Mission Control - dispatch assigned tasks
+After=network-online.target mission-control.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/maestro/ops.env
+ExecStart=/opt/maestro/ops/dispatch.sh
+TimeoutStartSec=900
+Nice=10

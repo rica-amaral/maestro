@@ -1,0 +1,6 @@
+[Unit]
+Description=Maestro - renew the Remote Control session before it is archived
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart maestro.service

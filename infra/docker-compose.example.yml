@@ -1,0 +1,76 @@
+# Automation and messaging layer that runs next to Mission Control on the same server.
+# Placeholders only. Mission Control itself runs as a systemd service (Next.js bound to localhost)
+# and is reachable only over the private mesh VPN.
+#
+# n8n: every workflow (WhatsApp routing, ERP sync, alerts from ops/ scripts).
+# Evolution API: WhatsApp, with no published port, so only n8n reaches it on the Docker network. Inbound numbers are
+# restricted by an allowlist (not published here), so an unknown number cannot drive an agent.
+
+services:
+  traefik:
+    image: traefik:v3
+    restart: always
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--certificatesresolvers.le.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+    ports: ["80:80", "443:443"]
+    volumes:
+      - traefik_data:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: always
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.n8n.rule=Host(`n8n.example.com`)
+      - traefik.http.routers.n8n.entrypoints=websecure
+      - traefik.http.routers.n8n.tls.certresolver=le
+    environment:
+      - N8N_HOST=n8n.example.com
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://n8n.example.com/
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_PROXY_HOPS=1
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+    volumes: [n8n_data:/home/node/.n8n]
+
+  evolution-api:
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: always
+    environment:
+      - SERVER_URL=${EVOLUTION_SERVER_URL}
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:${POSTGRES_PASSWORD}@evolution-postgres:5432/evolution?schema=public
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://evolution-redis:6379/6
+      - LOG_LEVEL=ERROR
+    depends_on: [evolution-postgres, evolution-redis]
+
+  evolution-postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=evolution
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=evolution
+    volumes: [evolution_pg:/var/lib/postgresql/data]
+
+  evolution-redis:
+    image: redis:7-alpine
+    restart: always
+    volumes: [evolution_redis:/data]
+
+volumes:
+  traefik_data:
+  n8n_data:
+  evolution_pg:
+  evolution_redis:

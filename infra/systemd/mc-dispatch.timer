@@ -1,0 +1,11 @@
+# Dispatch every 10 minutes, 24 hours a day. The token governor protects the quota.
+[Unit]
+Description=Mission Control dispatch every 10 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/10:00
+Persistent=false
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

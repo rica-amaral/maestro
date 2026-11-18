@@ -1,0 +1,18 @@
+# The Maestro: one long-lived Claude Code session on the server, reachable from every device
+# through Remote Control (desktop, phone app, browser). tmux keeps it alive without a terminal.
+[Unit]
+Description=Maestro - single Claude Code session (Remote Control)
+After=network-online.target mission-control.service
+Wants=network-online.target
+
+[Service]
+Type=forking
+WorkingDirectory=/opt/maestro
+EnvironmentFile=/opt/maestro/maestro.env
+ExecStart=/usr/bin/tmux new-session -d -s maestro -x 200 -y 50 'claude --remote-control maestro'
+ExecStop=/usr/bin/tmux kill-session -t maestro
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
